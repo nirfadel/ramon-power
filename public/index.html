@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>רם-און | מערכת ניהול הפסקות חשמל</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f14;--surface:#141720;--surface2:#1c2030;--border:#252a3a;
+  --accent:#f5a623;--accent2:#e84d4d;--accent3:#4dbecc;
+  --text:#e8ecf4;--text-muted:#7a8299;
+  --success:#3ecf8e;--voltage:#b06ef5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:36px;height:36px;background:var(--accent);clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%);display:flex;align-items:center;justify-content:center;font-size:16px;animation:pglow 3s ease-in-out infinite}
+@keyframes pglow{0%,100%{filter:drop-shadow(0 0 4px rgba(245,166,35,.4))}50%{filter:drop-shadow(0 0 14px rgba(245,166,35,.9))}}
+.logo-text{font-size:1.1rem;font-weight:700}
+.logo-sub{font-size:.7rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace}
+nav{display:flex;gap:4px}
+nav button{background:none;border:none;color:var(--text-muted);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:.9rem;transition:all .2s}
+nav button:hover,nav button.active{background:var(--surface2);color:var(--text)}
+nav button.active{color:var(--accent);border-bottom:2px solid var(--accent);border-radius:6px 6px 0 0}
+.live-badge{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--text-muted)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:blink 1.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+main{max-width:1400px;margin:0 auto;padding:2rem}
+.page{display:none}.page.active{display:block}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;right:0;width:3px;height:100%;border-radius:0 12px 12px 0}
+.stat-card.orange::before{background:var(--accent)}
+.stat-card.red::before{background:var(--accent2)}
+.stat-card.blue::before{background:var(--accent3)}
+.stat-card.purple::before{background:var(--voltage)}
+.stat-label{font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.stat-value{font-size:2.2rem;font-weight:900;line-height:1;font-family:'IBM Plex Mono',monospace}
+.stat-card.orange .stat-value{color:var(--accent)}
+.stat-card.red .stat-value{color:var(--accent2)}
+.stat-card.blue .stat-value{color:var(--accent3)}
+.stat-card.purple .stat-value{color:var(--voltage)}
+.stat-sub{font-size:.75rem;color:var(--text-muted);margin-top:4px}
+
+/* EVENTS */
+.section-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.filter-row{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+.filter-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);border-radius:20px;padding:5px 14px;font-size:.8rem;cursor:pointer;font-family:'Heebo',sans-serif;transition:all .2s}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(245,166,35,.08)}
+.events-list{display:flex;flex-direction:column;gap:8px}
+.event-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;transition:border-color .2s,transform .15s}
+.event-row:hover{border-color:var(--accent);transform:translateX(-2px)}
+.event-type-badge{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.badge-fault{background:rgba(232,77,77,.15);color:var(--accent2);border:1px solid rgba(232,77,77,.3)}
+.badge-planned{background:rgba(77,190,204,.15);color:var(--accent3);border:1px solid rgba(77,190,204,.3)}
+.badge-voltage{background:rgba(176,110,245,.15);color:var(--voltage);border:1px solid rgba(176,110,245,.3)}
+.badge-unknown{background:rgba(245,166,35,.15);color:var(--accent);border:1px solid rgba(245,166,35,.3)}
+.event-datetime{font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--text-muted)}
+.event-desc{font-size:.9rem;color:var(--text)}
+.event-duration{font-family:'IBM Plex Mono',monospace;font-size:.85rem;color:var(--accent);text-align:center}
+.report-count-badge{background:rgba(62,207,142,.1);color:var(--success);border:1px solid rgba(62,207,142,.3);border-radius:12px;padding:2px 8px;font-size:.72rem;white-space:nowrap}
+.event-actions{display:flex;gap:6px}
+.icon-btn{background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;font-size:.9rem;transition:background .2s;color:var(--text-muted)}
+.icon-btn:hover{background:var(--surface2);color:var(--text)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;position:relative}
+.modal-title{font-size:1.2rem;font-weight:700;margin-bottom:.25rem}
+.modal-sub{font-size:.85rem;color:var(--text-muted);margin-bottom:1.5rem}
+.close-btn{position:absolute;top:1rem;left:1rem;background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;line-height:1}
+.close-btn:hover{color:var(--text)}
+
+/* REPORTS LIST IN MODAL */
+.reports-list{display:flex;flex-direction:column;gap:8px;margin-top:1rem}
+.report-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem}
+.report-item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.report-name{font-weight:600;font-size:.9rem}
+.report-time{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--text-muted)}
+.report-notes{font-size:.82rem;color:var(--text-muted);margin-top:4px}
+.report-contact{font-size:.75rem;color:var(--accent3);margin-top:2px}
+
+/* STATUS SELECTOR */
+.status-selector{display:flex;gap:8px;margin-bottom:1rem}
+.status-btn{flex:1;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:8px;padding:8px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:.82rem;text-align:center;transition:all .2s}
+.status-btn.sel-open{border-color:var(--accent2);background:rgba(232,77,77,.1);color:var(--accent2)}
+.status-btn.sel-closed{border-color:var(--success);background:rgba(62,207,142,.1);color:var(--success)}
+.status-btn.sel-confirmed{border-color:var(--accent3);background:rgba(77,190,204,.1);color:var(--accent3)}
+
+/* FORM */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;max-width:720px;margin:0 auto}
+.form-title{font-size:1.4rem;font-weight:700;margin-bottom:.25rem}
+.form-subtitle{font-size:.85rem;color:var(--text-muted);margin-bottom:2rem}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group.full{grid-column:1/-1}
+label{font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Heebo',sans-serif;font-size:.9rem;direction:rtl;transition:border-color .2s,box-shadow .2s;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,166,35,.1)}
+select option{background:var(--surface)}
+textarea{resize:vertical;min-height:80px}
+.type-selector{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;grid-column:1/-1}
+.type-btn{border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:8px;padding:10px 8px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:.82rem;text-align:center;transition:all .2s}
+.type-btn.selected-fault{border-color:var(--accent2);background:rgba(232,77,77,.1);color:var(--accent2)}
+.type-btn.selected-planned{border-color:var(--accent3);background:rgba(77,190,204,.1);color:var(--accent3)}
+.type-btn.selected-voltage{border-color:var(--voltage);background:rgba(176,110,245,.1);color:var(--voltage)}
+.type-btn.selected-unknown{border-color:var(--accent);background:rgba(245,166,35,.1);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#000;border:none;border-radius:8px;padding:12px 28px;font-family:'Heebo',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-primary:hover{background:#e09820;transform:translateY(-1px);box-shadow:0 4px 16px rgba(245,166,35,.3)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px 28px;font-family:'Heebo',sans-serif;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{border-color:var(--accent3);color:var(--accent3)}
+.btn-sm{padding:6px 14px;font-size:.82rem}
+
+/* PUBLIC BANNER */
+.public-banner{background:linear-gradient(135deg,rgba(77,190,204,.15),rgba(245,166,35,.1));border:1px solid rgba(77,190,204,.3);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:2rem;display:flex;align-items:center;gap:1rem}
+.public-banner-icon{font-size:2rem}
+.public-banner-text{font-size:.9rem;line-height:1.6}
+.public-banner-link{font-family:'IBM Plex Mono',monospace;background:var(--surface2);padding:4px 10px;border-radius:6px;font-size:.8rem;color:var(--accent3);cursor:pointer;border:1px solid var(--border)}
+.public-banner-link:hover{border-color:var(--accent3)}
+
+/* REPORT PAGE (PUBLIC) */
+.public-page{display:none;flex-direction:column;align-items:center;padding:2rem 1rem;min-height:100vh;background:var(--bg)}
+.public-page.active{display:flex}
+.public-header{text-align:center;margin-bottom:2rem}
+.public-header h1{font-size:1.8rem;font-weight:900;margin-bottom:.5rem}
+.public-header p{color:var(--text-muted);font-size:.9rem}
+
+/* DEDUP */
+.dedup-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.5rem}
+.dedup-result{background:var(--surface2);border-radius:8px;padding:1rem;margin-top:1rem;font-size:.85rem;display:none}
+
+/* REPORT PAGE */
+.report-controls{display:flex;gap:1rem;margin-bottom:1.5rem;align-items:center;flex-wrap:wrap}
+.report-controls input,.report-controls select{width:auto;flex:1;min-width:150px}
+.report-preview{background:#fff;color:#111;border-radius:12px;padding:2.5rem;font-family:'Heebo',sans-serif;direction:rtl;box-shadow:0 4px 32px rgba(0,0,0,.4)}
+.report-header{border-bottom:3px solid #1a1a2e;padding-bottom:1.5rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:flex-start}
+.report-org{font-size:1.3rem;font-weight:900;color:#1a1a2e}
+.report-to{font-size:.85rem;color:#555;margin-top:4px}
+.report-meta{text-align:left;font-size:.8rem;color:#666;font-family:monospace}
+.report-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:1rem}
+.report-table th{background:#1a1a2e;color:#fff;padding:8px 12px;text-align:right;font-weight:600}
+.report-table td{padding:8px 12px;border-bottom:1px solid #e5e5e5;color:#333}
+.report-table tr:nth-child(even) td{background:#f9f9f9}
+.report-summary-box{background:#f0f4ff;border:1px solid #ccd;border-radius:8px;padding:1rem;margin-top:1.5rem;font-size:.85rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(100px);background:var(--success);color:#000;padding:12px 24px;border-radius:40px;font-weight:700;font-size:.9rem;transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.empty-state{text-align:center;padding:3rem;color:var(--text-muted)}
+.empty-state .icon{font-size:3rem;margin-bottom:1rem;opacity:.4}
+.loader{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:768px){.stats-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.type-selector{grid-template-columns:repeat(2,1fr)}.event-row{grid-template-columns:auto 1fr}.event-duration,.report-count-badge{display:none}main{padding:1rem}nav button{padding:8px 10px;font-size:.8rem}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">מושב רם-און</div>
+      <div class="logo-sub">POWER OUTAGE MANAGEMENT</div>
+    </div>
+  </div>
+  <nav id="main-nav">
+    <button class="active" onclick="showPage('dashboard',this)">📊 לוח בקרה</button>
+    <button onclick="showPage('report-form',this)">➕ דיווח חדש</button>
+    <button onclick="showPage('sms-import',this)">📱 יבוא SMS</button>
+    <button onclick="showPage('admin',this)">🛠️ ניהול</button>
+    <button onclick="showPage('generate-report',this)">📄 דו"ח</button>
+  </nav>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    <span id="live-time">--:--:--</span>
+  </div>
+</header>
+
+<main>
+
+<!-- DASHBOARD ─────────────────────────────────────────────────── -->
+<div id="dashboard" class="page active">
+  <div style="margin-bottom:1.5rem">
+    <div style="font-size:1.6rem;font-weight:900">לוח בקרה</div>
+    <div style="font-size:.85rem;color:var(--text-muted)">ניטור אירועי חשמל · מושב רם-און</div>
+  </div>
+
+  <!-- Public link banner -->
+  <div class="public-banner">
+    <div class="public-banner-icon">🔗</div>
+    <div style="flex:1">
+      <div class="public-banner-text">
+        <strong>לינק לדיווח ציבורי לתושבים:</strong><br>
+        שלח את הלינק הבא לתושבי רם-און — לא נדרשת התחברות
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <code class="public-banner-link" id="public-url">טוען...</code>
+        <button class="btn-secondary btn-sm" onclick="copyPublicLink()">📋 העתק</button>
+        <button class="btn-secondary btn-sm" onclick="showPage('public-report',null)">👁️ תצוגה מקדימה</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card red"><div class="stat-label">סה"כ אירועים</div><div class="stat-value" id="stat-total">—</div><div class="stat-sub">30 ימים אחרונים</div></div>
+    <div class="stat-card orange"><div class="stat-label">שעות ללא חשמל</div><div class="stat-value" id="stat-hours">—</div><div class="stat-sub">סה"כ זמן השבתה</div></div>
+    <div class="stat-card blue"><div class="stat-label">הפסקות יזומות</div><div class="stat-value" id="stat-planned">—</div><div class="stat-sub">על פי הודעה</div></div>
+    <div class="stat-card purple"><div class="stat-label">נפילות מתח</div><div class="stat-value" id="stat-voltage">—</div><div class="stat-sub">רשומות</div></div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="filterEvents('all',this)">הכל</button>
+    <button class="filter-btn" onclick="filterEvents('fault',this)">⚠️ תקלה</button>
+    <button class="filter-btn" onclick="filterEvents('planned',this)">🗓️ יזומה</button>
+    <button class="filter-btn" onclick="filterEvents('voltage',this)">📉 מתח</button>
+    <button class="filter-btn" onclick="filterEvents('unknown',this)">❓ לא ידוע</button>
+    <div style="flex:1"></div>
+    <button class="filter-btn" onclick="loadEvents()">🔄 רענן</button>
+  </div>
+
+  <div class="section-title">אירועים אחרונים</div>
+  <div class="events-list" id="events-list">
+    <div class="empty-state"><div class="icon">⏳</div><div>טוען נתונים...</div></div>
+  </div>
+</div>
+
+<!-- REPORT FORM ────────────────────────────────────────────────── -->
+<div id="report-form" class="page">
+  <div class="form-card">
+    <div class="form-title">דיווח אירוע חשמל</div>
+    <div class="form-subtitle">הזנה ידנית של הפסקה, נפילת מתח, או תקלה. המערכת תמזג אוטומטית עם אירועים דומים.</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>סוג האירוע</label>
+        <div class="type-selector">
+          <button class="type-btn" data-type="fault"   onclick="selectType('fault',this)">⚠️ תקלה</button>
+          <button class="type-btn" data-type="planned" onclick="selectType('planned',this)">🗓️ יזומה</button>
+          <button class="type-btn" data-type="voltage" onclick="selectType('voltage',this)">📉 נפילת מתח</button>
+          <button class="type-btn" data-type="unknown" onclick="selectType('unknown',this)">❓ לא ידוע</button>
+        </div>
+      </div>
+      <div class="form-group"><label>שם</label><input id="f-name" placeholder="ישראל ישראלי"></div>
+      <div class="form-group"><label>טלפון</label><input id="f-phone" type="tel" placeholder="05X-XXXXXXX"></div>
+      <div class="form-group"><label>מייל</label><input id="f-email" type="email" placeholder="israel@ramon.co.il"></div>
+      <div class="form-group"><label>מיקום / רחוב</label><input id="f-location" placeholder="בית ספציפי, שכונה..."></div>
+      <div class="form-group"><label>תאריך ושעת תחילה</label><input id="f-start" type="datetime-local"></div>
+      <div class="form-group"><label>משך האירוע</label>
+        <div style="display:flex;gap:8px">
+          <input id="f-dur-h" type="number" placeholder="שעות" min="0" style="flex:1">
+          <input id="f-dur-m" type="number" placeholder="דקות" min="0" max="59" style="flex:1">
+          <input id="f-dur-s" type="number" placeholder="שניות" min="0" max="59" step="0.1" style="flex:1">
+        </div>
+      </div>
+      <div class="form-group full"><label>תיאור / הערות</label><textarea id="f-desc" placeholder="מה ראית? האם שכנים הושפעו? האם ציוד נפגע?"></textarea></div>
+      <div class="form-group full"><label>מקור</label>
+        <select id="f-source">
+          <option value="manual">דיווח ידני</option>
+          <option value="sms">SMS חברת חשמל</option>
+          <option value="whatsapp">WhatsApp קבוצה</option>
+          <option value="neighbor">שכן / פה לאוזן</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1rem">
+      <button class="btn-primary" id="submit-btn" onclick="submitEvent()">⚡ שלח דיווח</button>
+      <button class="btn-secondary" onclick="clearForm()">נקה</button>
+    </div>
+  </div>
+</div>
+
+<!-- SMS IMPORT ──────────────────────────────────────────────────── -->
+<div id="sms-import" class="page">
+  <div class="form-card" style="max-width:800px">
+    <div class="form-title">📱 יבוא SMS מחברת חשמל</div>
+    <div class="form-subtitle">הדבק הודעת SMS — המערכת תחלץ פרטים ותמזג עם אירועים קיימים</div>
+    <div class="form-group" style="margin-bottom:1rem">
+      <label>טקסט ההודעה</label>
+      <textarea id="sms-text" style="min-height:120px;font-family:'IBM Plex Mono',monospace;font-size:.82rem" placeholder='לדוגמה: "חברת חשמל לישראל: הפסקת חשמל מתוכננת ביום 20.04.2025 בין 09:00-13:00 באזור רם-און לצורך תחזוקה."'></textarea>
+    </div>
+    <button class="btn-primary" onclick="parseSMS()">🔍 נתח והוסף</button>
+    <div id="sms-result" style="margin-top:1rem;display:none">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem">
+        <div id="sms-result-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN ───────────────────────────────────────────────────────── -->
+<div id="admin" class="page">
+  <div style="margin-bottom:1.5rem">
+    <div style="font-size:1.4rem;font-weight:700">🛠️ ניהול מערכת</div>
+    <div style="font-size:.85rem;color:var(--text-muted)">כלים לוועד ולמנהל המערכת</div>
+  </div>
+
+  <div class="dedup-card">
+    <div style="font-size:1rem;font-weight:700;margin-bottom:.5rem">🔍 תצוגה מקדימה של נרמול</div>
+    <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:1rem">
+      סורק את כל האירועים ומוזג אירועים שהם כנראה אותו אירוע (אותו סוג, בטווח של 90 דקות).
+      הדיווחים מכל הכפילויות עוברים לאירוע המאוחד, והזמן מחושב כממוצע.
+    </div>
+    <button class="btn-secondary" onclick="previewNormalization()">🔍 הצג נרמול</button>
+    <div id="dedup-result" class="dedup-result"></div>
+  </div>
+
+  <div class="dedup-card">
+    <div style="font-size:1rem;font-weight:700;margin-bottom:.5rem">📊 סטטיסטיקות DB</div>
+    <div id="admin-stats" style="font-size:.85rem;color:var(--text-muted)">לוחץ על "רענן" לטעינה</div>
+    <button class="btn-secondary" style="margin-top:1rem" onclick="loadAdminStats()">🔄 רענן</button>
+  </div>
+</div>
+
+<!-- GENERATE REPORT ──────────────────────────────────────────────── -->
+<div id="generate-report" class="page">
+  <div style="margin-bottom:1.5rem">
+    <div style="font-size:1.4rem;font-weight:700">📄 דו"ח לחברת חשמל</div>
+    <div style="font-size:.85rem;color:var(--text-muted)">ייצא אירועים מתועדים כדו"ח רשמי</div>
+  </div>
+  <div class="report-controls">
+    <input type="date" id="r-from" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+    <input type="date" id="r-to"   style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+    <select id="r-type-filter" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+      <option value="all">כל הסוגים</option>
+      <option value="fault">תקלות</option>
+      <option value="planned">יזומות</option>
+      <option value="voltage">נפילות מתח</option>
+    </select>
+    <button class="btn-primary" onclick="generateReport()">🔄 צור דו"ח</button>
+    <button class="btn-secondary" onclick="window.print()">🖨️ הדפס</button>
+  </div>
+  <div id="report-output"></div>
+</div>
+
+<!-- PUBLIC REPORT (for residents) ──────────────────────────────── -->
+<div id="public-report" class="page">
+  <div class="public-header">
+    <div style="font-size:2rem">⚡</div>
+    <h1>דיווח הפסקת חשמל</h1>
+    <p>מושב רם-און — דווח על תקלה, הפסקה, או נפילת מתח</p>
+  </div>
+
+  <div class="form-card" style="width:100%">
+    <div class="form-title">דיווח חדש</div>
+    <div class="form-subtitle">המערכת תמזג אוטומטית דיווחים על אותה הפסקה — אין צורך להתחבר.</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>סוג האירוע</label>
+        <div class="type-selector">
+          <button class="type-btn" data-type="fault"   onclick="selectTypePub('fault',this)">⚠️ תקלה</button>
+          <button class="type-btn" data-type="planned" onclick="selectTypePub('planned',this)">🗓️ יזומה</button>
+          <button class="type-btn" data-type="voltage" onclick="selectTypePub('voltage',this)">📉 נפילת מתח</button>
+          <button class="type-btn" data-type="unknown" onclick="selectTypePub('unknown',this)">❓ לא ידוע</button>
+        </div>
+      </div>
+      <div class="form-group"><label>שמך</label><input id="p-name" placeholder="ישראל ישראלי (אופציונלי)"></div>
+      <div class="form-group"><label>טלפון</label><input id="p-phone" type="tel" placeholder="05X-XXXXXXX (אופציונלי)"></div>
+      <div class="form-group"><label>תאריך ושעה</label><input id="p-start" type="datetime-local"></div>
+      <div class="form-group"><label>משך (בערך)</label>
+        <div style="display:flex;gap:8px">
+          <input id="p-dur-h" type="number" placeholder="שעות" min="0" style="flex:1">
+          <input id="p-dur-m" type="number" placeholder="דקות" min="0" max="59" style="flex:1">
+          <input id="p-dur-s" type="number" placeholder="שניות" min="0" max="59" step="0.1" style="flex:1">
+        </div>
+      </div>
+      <div class="form-group full"><label>הערות</label><textarea id="p-notes" placeholder="מה שמת לב? איפה אתה גר?"></textarea></div>
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1rem">
+      <button class="btn-primary" id="pub-submit-btn" onclick="submitPublicReport()">📤 שלח דיווח</button>
+    </div>
+    <div id="pub-success" style="display:none;margin-top:1rem;background:rgba(62,207,142,.1);border:1px solid rgba(62,207,142,.3);border-radius:8px;padding:1rem;color:var(--success);font-weight:600">
+      ✅ תודה! הדיווח נשמר. המערכת בדקה אם יש אירוע דומה ומיזגה בהתאם.
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- EVENT DETAIL MODAL ──────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="event-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/api/reports';
+const TYPE_LABELS = { fault:'תקלה', planned:'יזומה', voltage:'נפילת מתח', unknown:'לא ידוע' };
+const TYPE_BADGE  = { fault:'badge-fault', planned:'badge-planned', voltage:'badge-voltage', unknown:'badge-unknown' };
+const STATUS_LABELS = { open:'פתוח', closed:'סגור', confirmed:'מאושר' };
+let selectedType = null, selectedTypePub = null;
+let allReports = [], currentFilter = 'all';
+
+// ─── CLOCK ─────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('live-time').textContent = new Date().toLocaleTimeString('he-IL');
+}, 1000);
+
+// Public URL
+document.getElementById('public-url').textContent = window.location.origin + '/?page=report';
+
+// ─── NAVIGATION ────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'dashboard') { loadStats(); loadEvents(); }
+}
+
+// ─── API HELPERS ───────────────────────────────────────────────
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  return res.json();
+}
+
+// ─── STATS ─────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const { stats } = await apiFetch(API + '/stats');
+    document.getElementById('stat-total').textContent   = stats.totalReports;
+    document.getElementById('stat-hours').textContent   = stats.hours;
+    document.getElementById('stat-planned').textContent = stats.byType.planned;
+    document.getElementById('stat-voltage').textContent = stats.byType.voltage;
+  } catch(e) { console.error(e); }
+}
+
+// ─── EVENTS LIST ───────────────────────────────────────────────
+async function loadEvents(filter) {
+  if (filter !== undefined) currentFilter = filter;
+  const list = document.getElementById('events-list');
+  list.innerHTML = '<div class="empty-state"><div class="loader"></div></div>';
+  try {
+    const q = currentFilter !== 'all' ? `?type=${currentFilter}` : '';
+    const { reports } = await apiFetch(API + q);
+    allReports = reports;
+    renderEvents(reports);
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>שגיאה בטעינת נתונים. האם השרת פועל?</div></div>';
+  }
+}
+
+function filterEvents(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadEvents(type);
+}
+
+function renderEvents(events) {
+  const list = document.getElementById('events-list');
+  if (!events.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">⚡</div><div>אין אירועים</div></div>';
+    return;
+  }
+  list.innerHTML = events.map(e => {
+    const dur = fmtDuration(e.durationSeconds);
+    return `
+    <div class="event-row" onclick="openModal('${e._id}')">
+      <span class="event-type-badge ${TYPE_BADGE[e.type]}">${TYPE_LABELS[e.type]}</span>
+      <div>
+        <div class="event-desc">${e.description || 'ללא תיאור'}</div>
+        <div class="event-datetime">${fmtDate(e.startTime)} · ${e.location || 'מיקום לא צוין'}</div>
+      </div>
+      <div class="event-duration">${dur}</div>
+      <span class="report-count-badge">${e.reporterName || "אנונימי"}</span>
+      <div class="event-actions" onclick="event.stopPropagation()">
+        <button class="icon-btn" onclick="openModal('${e._id}')" title="פרטים">🔍</button>
+        <button class="icon-btn" onclick="deleteEvent('${e._id}')" title="מחק">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TYPE SELECTORS ────────────────────────────────────────────
+function selectType(type, btn) {
+  selectedType = type;
+  document.querySelectorAll('#report-form .type-btn').forEach(b => b.className = 'type-btn');
+  btn.className = `type-btn selected-${type}`;
+}
+function selectTypePub(type, btn) {
+  selectedTypePub = type;
+  document.querySelectorAll('#public-report .type-btn').forEach(b => b.className = 'type-btn');
+  btn.className = `type-btn selected-${type}`;
+}
+
+// ─── SUBMIT (ועד) ──────────────────────────────────────────────
+async function submitEvent() {
+  if (!selectedType) { showToast('⚠️ בחר סוג אירוע', '#e84d4d'); return; }
+  const start = document.getElementById('f-start').value;
+  if (!start) { showToast('⚠️ חובה לציין תאריך ושעה', '#e84d4d'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'שולח... <span class="loader"></span>';
+
+  const payload = {
+    type:            selectedType,
+    startTime:       start,
+    durationSeconds: (parseFloat(document.getElementById('f-dur-h').value)||0)*3600 + (parseFloat(document.getElementById('f-dur-m').value)||0)*60 + (parseFloat(document.getElementById('f-dur-s').value)||0),
+    location:        document.getElementById('f-location').value,
+    description:     document.getElementById('f-desc').value,
+    source:          document.getElementById('f-source').value,
+    reporterName:    document.getElementById('f-name').value,
+    reporterPhone:   document.getElementById('f-phone').value,
+    reporterEmail:   document.getElementById('f-email').value,
+  };
+
+  try {
+    const r = await apiFetch(API, { method: 'POST', body: payload });
+    if (r.ok) {
+      const msg = '✅ הדיווח נשמר!';
+      showToast(msg);
+      clearForm();
+      setTimeout(() => showPage('dashboard', document.querySelector('nav button')), 700);
+    } else {
+      showToast('❌ ' + r.error, '#e84d4d');
+    }
+  } catch(e) { showToast('❌ שגיאת רשת', '#e84d4d'); }
+  finally { btn.disabled = false; btn.innerHTML = '⚡ שלח דיווח'; }
+}
+
+// ─── SUBMIT PUBLIC ─────────────────────────────────────────────
+async function submitPublicReport() {
+  if (!selectedTypePub) { showToast('⚠️ בחר סוג אירוע', '#e84d4d'); return; }
+  const start = document.getElementById('p-start').value;
+  if (!start) { showToast('⚠️ חובה לציין זמן', '#e84d4d'); return; }
+
+  const btn = document.getElementById('pub-submit-btn');
+  btn.disabled = true;
+
+  const payload = {
+    type:            selectedTypePub,
+    startTime:       start,
+    durationSeconds: (parseFloat(document.getElementById('p-dur-h').value)||0)*3600 + (parseFloat(document.getElementById('p-dur-m').value)||0)*60 + (parseFloat(document.getElementById('p-dur-s').value)||0),
+    reporterName:    document.getElementById('p-name').value || 'אנונימי',
+    reporterPhone:   document.getElementById('p-phone').value,
+    description:     document.getElementById('p-notes').value,
+    source:          'manual',
+  };
+
+  try {
+    const r = await apiFetch(API, { method: 'POST', body: payload });
+    if (r.ok) {
+      document.getElementById('pub-success').style.display = 'block';
+      ['p-name','p-phone','p-start','p-notes','p-dur-h','p-dur-m','p-dur-s'].forEach(id => document.getElementById(id).value = '');
+      selectedTypePub = null;
+      document.querySelectorAll('#public-report .type-btn').forEach(b => b.className = 'type-btn');
+    }
+  } catch(e) { showToast('❌ שגיאה בשליחה', '#e84d4d'); }
+  finally { btn.disabled = false; }
+}
+
+// ─── DELETE ────────────────────────────────────────────────────
+async function deleteEvent(id) {
+  if (!confirm('למחוק דיווח זה?')) return;
+  await apiFetch(`${API}/${id}`, { method: 'DELETE' });
+  showToast('🗑️ נמחק');
+  loadEvents(); loadStats();
+}
+
+// ─── MODAL ─────────────────────────────────────────────────────
+async function openModal(id) {
+  document.getElementById('event-modal').classList.remove('hidden');
+  document.getElementById('modal-content').innerHTML = '<div style="text-align:center;padding:2rem"><span class="loader" style="width:32px;height:32px"></span></div>';
+
+  const { report: r } = await apiFetch(`${API}/${id}`);
+
+  document.getElementById('modal-content').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:.25rem">
+      <span class="event-type-badge ${TYPE_BADGE[r.type]}">${TYPE_LABELS[r.type]}</span>
+      <span style="font-size:.8rem;color:var(--text-muted)">${STATUS_LABELS[r.status]}</span>
+      ${r.isOfficialNotice ? '<span style="font-size:.75rem;background:rgba(77,190,204,.15);color:var(--accent3);border:1px solid rgba(77,190,204,.3);border-radius:12px;padding:2px 8px">📡 הודעה רשמית</span>' : ''}
+    </div>
+    <div class="modal-title" style="margin-top:.5rem">${r.description || 'ללא תיאור'}</div>
+    <div class="modal-sub">${fmtDate(r.startTime)} · ${fmtDuration(r.durationSeconds)} · ${r.location || 'מיקום לא צוין'}</div>
+
+    <div style="background:var(--surface2);border-radius:8px;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem">
+      <div><strong>מדווח:</strong> ${r.reporterName || '—'}</div>
+      ${r.reporterPhone ? `<div><strong>טלפון:</strong> ${r.reporterPhone}</div>` : ''}
+      ${r.reporterEmail ? `<div><strong>מייל:</strong> ${r.reporterEmail}</div>` : ''}
+      <div><strong>מקור:</strong> ${r.source}</div>
+    </div>
+
+    <div style="margin-bottom:.75rem">
+      <label style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">עדכן סטטוס</label>
+      <div class="status-selector" style="margin-top:6px">
+        <button class="status-btn ${r.status==='open'?'sel-open':''}" onclick="updateStatus('${r._id}','open',this)">🔴 פתוח</button>
+        <button class="status-btn ${r.status==='closed'?'sel-closed':''}" onclick="updateStatus('${r._id}','closed',this)">✅ סגור</button>
+        <button class="status-btn ${r.status==='confirmed'?'sel-confirmed':''}" onclick="updateStatus('${r._id}','confirmed',this)">☑️ מאושר</button>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal() {
+  document.getElementById('event-modal').classList.add('hidden');
+}
+
+async function updateStatus(id, status, btn) {
+  document.querySelectorAll('.status-btn').forEach(b => { b.className = 'status-btn'; });
+  btn.className = `status-btn sel-${status}`;
+  await apiFetch(`${API}/${id}`, { method: 'PUT', body: { status } });
+  showToast('✅ סטטוס עודכן');
+  loadEvents(); loadStats();
+}
+
+// ─── SMS PARSE ─────────────────────────────────────────────────
+async function parseSMS() {
+  const text = document.getElementById('sms-text').value.trim();
+  if (!text) return;
+
+  let type = 'planned';
+  if (text.includes('תקלה') || text.includes('נפסקה')) type = 'fault';
+  else if (text.includes('נפילת מתח') || text.includes('מתח נמוך')) type = 'voltage';
+
+  const dateMatch = text.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
+  const timeMatch = text.match(/(\d{1,2}):(\d{2})/g);
+
+  let startTime = null, durationSeconds = 0;
+  if (dateMatch && timeMatch) {
+    const d = dateMatch[1].padStart(2,'0'), m = dateMatch[2].padStart(2,'0');
+    const y = dateMatch[3].length===2 ? '20'+dateMatch[3] : dateMatch[3];
+    startTime = `${y}-${m}-${d}T${timeMatch[0]}`;
+    if (timeMatch.length >= 2) {
+      const [h1,m1] = timeMatch[0].split(':').map(Number);
+      const [h2,m2] = timeMatch[1].split(':').map(Number);
+      durationSeconds = ((h2*60+m2)-(h1*60+m1)) * 60;
+    }
+  }
+
+  const payload = { type, startTime: startTime || new Date().toISOString(), durationSeconds, description: text, source: 'sms', reporterName: 'חברת חשמל לישראל', isOfficialNotice: true };
+
+  const r = await apiFetch(API, { method: 'POST', body: payload });
+  const el = document.getElementById('sms-result');
+  el.style.display = 'block';
+  document.getElementById('sms-result-content').innerHTML = r.ok
+    ? `<div style="color:var(--success);font-weight:700">✅ דיווח נשמר</div>
+       <div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">סוג: ${TYPE_LABELS[type]} · ${startTime ? fmtDate(startTime) : 'זמן לא זוהה'} · ${fmtDuration(durationSeconds)}</div>`
+    : `<div style="color:var(--accent2)">❌ ${r.error}</div>`;
+}
+
+// ─── ADMIN STATS ──────────────────────────────────────────────
+async function loadAdminStats() {
+  const { stats } = await apiFetch(API + '/stats');
+  document.getElementById('admin-stats').innerHTML = `
+    <div>סה"כ דיווחים (30 יום): <strong>${stats.totalReports}</strong></div>
+    <div>שעות מדווחות: <strong>${stats.hours}</strong></div>
+    <div>פתוחים: <strong>${stats.byStatus.open}</strong> · סגורים: <strong>${stats.byStatus.closed}</strong> · מאושרים: <strong>${stats.byStatus.confirmed}</strong></div>
+  `;
+}
+
+// ─── NORMALIZATION PREVIEW ────────────────────────────────────
+async function previewNormalization() {
+  const el = document.getElementById('dedup-result');
+  el.style.display = 'block';
+  el.innerHTML = '<span class="loader"></span> מחשב...';
+  const r = await apiFetch(API + '/normalized');
+  if (!r.ok) { el.innerHTML = `<span style="color:var(--accent2)">❌ ${r.error}</span>`; return; }
+  el.innerHTML = `
+    <strong>תצוגה מקדימה של נרמול:</strong><br>
+    ${r.raw.length} דיווחים גולמיים → <strong>${r.normalized.length} אירועים מנורמלים</strong><br>
+    <span style="font-size:.8rem;color:var(--text-muted)">
+      (זה רק תצוגה — הנתונים לא שונו. הנרמול האמיתי קורה בדו"ח.)
+    </span>
+  `;
+}
+
+// ─── REPORT ────────────────────────────────────────────────────
+async function generateReport() {
+  const from = document.getElementById('r-from').value;
+  const to   = document.getElementById('r-to').value;
+  const type = document.getElementById('r-type-filter').value;
+  const q = new URLSearchParams({ ...(from&&{from}), ...(to&&{to}), ...(type!=='all'&&{type}) });
+
+  // קריאה ל-/normalized — הנרמול קורה כאן, לא בDB
+  const { normalized, raw, stats } = await apiFetch(API + '/normalized?' + q);
+
+  const rows = normalized.map((e,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${fmtDate(e.startTime)}</td>
+      <td>${TYPE_LABELS[e.type]}</td>
+      <td>${fmtDuration(e.durationSeconds)}</td>
+      <td>${e.location||'—'}</td>
+      <td>${e.reporterCount} ${e.isOfficialNotice ? '📡' : ''}</td>
+      <td>${e.description||'—'}</td>
+    </tr>`).join('');
+
+  const tm = stats.totalSeconds;
+  document.getElementById('report-output').innerHTML = `
+    <div style="background:rgba(62,207,142,.08);border:1px solid rgba(62,207,142,.2);border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.85rem;color:var(--text-muted)">
+      📊 <strong style="color:var(--text)">${raw.length} דיווחים גולמיים</strong> מוזגו ל-<strong style="color:var(--success)">${normalized.length} אירועים מנורמלים</strong>
+      (דיווחים על אותה הפסקה בטווח ±90 דקות קובצו יחד)
+    </div>
+    <div class="report-preview">
+      <div class="report-header">
+        <div>
+          <div class="report-org">מושב רם-און — ועד הישוב</div>
+          <div class="report-to">לכבוד: חברת חשמל לישראל — שירות לקוחות</div>
+          <div class="report-to">נושא: דוח תיעוד הפסקות חשמל ואירועי מתח</div>
+        </div>
+        <div class="report-meta">
+          <div>תאריך הפקה: ${new Date().toLocaleDateString('he-IL')}</div>
+          <div>אירועים מנורמלים: ${normalized.length}</div>
+          <div>דיווחים גולמיים: ${raw.length}</div>
+          <div>סה"כ: ${(tm/3600).toFixed(1)} שעות</div>
+        </div>
+      </div>
+      <p style="font-size:.85rem;color:#444;margin-bottom:1rem;line-height:1.7">
+        הנתונים להלן מנורמלים — דיווחים כפולים על אותו אירוע קובצו לשורה אחת.
+        טור "מדווחים" מציין כמה תושבים דיווחו על אותה הפסקה (📡 = כולל הודעה רשמית מחברת חשמל).
+      </p>
+      <table class="report-table">
+        <thead><tr><th>#</th><th>תאריך ושעה</th><th>סוג</th><th>משך (שש:דד)</th><th>מיקום</th><th>מדווחים</th><th>תיאור</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:#999">אין נתונים בטווח זה</td></tr>'}</tbody>
+      </table>
+      <div class="report-summary-box">
+        <strong>סיכום:</strong> ${normalized.length} אירועים מנורמלים (מתוך ${raw.length} דיווחים) ·
+        זמן השבתה כולל: <strong>${fmtDuration(tm)}</strong> ·
+        ${stats.byType.fault} תקלות · ${stats.byType.planned} יזומות · ${stats.byType.voltage} נפילות מתח.<br><br>
+        אנו מבקשים לבחון את הנתונים ולפעול לשיפור אמינות אספקת החשמל לישוב.<br><br>
+        בכבוד רב, <strong>ועד מושב רם-און</strong>
+      </div>
+    </div>`;
+}
+
+// ─── UTILS ─────────────────────────────────────────────────────
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtDuration(s) {
+  if (!s) return '—';
+  if (s < 60) return `${s % 1 === 0 ? s : s.toFixed(1)} שנ'`;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.round(s % 60);
+  if (h > 0) return `${h}ש' ${m}ד'${sec ? ` ${sec}שנ'` : ''}`;
+  return `${m}ד'${sec ? ` ${sec}שנ'` : ''}`;
+}
+function showToast(msg, color='#3ecf8e') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.background = color;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+function clearForm() {
+  ['f-name','f-phone','f-email','f-location','f-start','f-desc','f-dur-h','f-dur-m','f-dur-s'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('f-source').value = 'manual';
+  selectedType = null;
+  document.querySelectorAll('#report-form .type-btn').forEach(b => b.className='type-btn');
+}
+function copyPublicLink() {
+  navigator.clipboard.writeText(window.location.origin + '/?page=report');
+  showToast('📋 הלינק הועתק!');
+}
+
+// ─── INIT ──────────────────────────────────────────────────────
+const today    = new Date().toISOString().split('T')[0];
+const monthAgo = new Date(Date.now()-30*24*60*60*1000).toISOString().split('T')[0];
+document.getElementById('r-from').value = monthAgo;
+document.getElementById('r-to').value   = today;
+document.getElementById('f-start').value = new Date().toISOString().slice(0,16);
+document.getElementById('p-start').value = new Date().toISOString().slice(0,16);
+
+// Handle direct link to public page
+if (new URLSearchParams(location.search).get('page') === 'report') {
+  document.querySelector('header').style.display = 'none';
+  showPage('public-report', null);
+} else {
+  loadStats();
+  loadEvents();
+}
+</script>
+</body>
+</html>
