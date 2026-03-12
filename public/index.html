@@ -158,7 +158,23 @@ textarea{resize:vertical;min-height:80px}
 .empty-state .icon{font-size:3rem;margin-bottom:1rem;opacity:.4}
 .loader{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:768px){.stats-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.type-selector{grid-template-columns:repeat(2,1fr)}.event-row{grid-template-columns:auto 1fr}.event-duration,.report-count-badge{display:none}main{padding:1rem}nav button{padding:8px 10px;font-size:.8rem}}
+@media(max-width:768px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .form-grid{grid-template-columns:1fr}
+  .type-selector{grid-template-columns:repeat(2,1fr)}
+  .event-row{grid-template-columns:auto 1fr}
+  .event-duration,.report-count-badge{display:none}
+  main{padding:.75rem}
+  nav{gap:2px;flex-wrap:wrap}
+  nav button{padding:6px 8px;font-size:.75rem}
+  header{padding:0 .75rem;flex-wrap:wrap;height:auto;gap:8px;padding-top:8px;padding-bottom:8px}
+  .logo-text{font-size:1rem}
+  .public-banner{flex-direction:column;gap:8px;padding:1rem}
+  .public-banner-icon{display:none}
+  .form-card{padding:1.25rem}
+  .report-controls{flex-direction:column}
+  .report-controls input,.report-controls select{width:100%}
+}
 </style>
 </head>
 <body>
@@ -201,8 +217,8 @@ textarea{resize:vertical;min-height:80px}
         <strong>לינק לדיווח ציבורי לתושבים:</strong><br>
         שלח את הלינק הבא לתושבי רם-און — לא נדרשת התחברות
       </div>
-      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-        <code class="public-banner-link" id="public-url">טוען...</code>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <code class="public-banner-link" id="public-url" style="word-break:break-all;min-width:0;flex:1 1 100%">טוען...</code>
         <button class="btn-secondary btn-sm" onclick="copyPublicLink()">📋 העתק</button>
         <button class="btn-secondary btn-sm" onclick="showPage('public-report',null)">👁️ תצוגה מקדימה</button>
       </div>
@@ -236,8 +252,7 @@ textarea{resize:vertical;min-height:80px}
 <div id="report-form" class="page">
   <div class="form-card">
     <div class="form-title">דיווח אירוע חשמל</div>
-    <div class="form-subtitle">הזנה ידנית של הפסקה, נפילת מתח, או תקלה. המערכת תמזג אוטומטית עם אירועים דומים.</div>
-    <div class="form-grid">
+      <div class="form-grid">
       <div class="form-group full">
         <label>סוג האירוע</label>
         <div class="type-selector">
